@@ -14,8 +14,10 @@ from homeassistant.config_entries import (
     ConfigFlow,
     OptionsFlowWithConfigEntry,
 )
+from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import (
     BluetoothServiceInfoBleak,
+    BluetoothChange,
     async_discovered_service_info,
 )
 from homeassistant.const import CONF_ADDRESS
@@ -311,23 +313,42 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
             self._discovered_devices[discovery.address] = discovery
         else:
             current_addresses = self._async_current_ids()
-            try:
-                discoveries = async_discovered_service_info(self.hass, connectable=False)
-            except TypeError:
-                discoveries = async_discovered_service_info(self.hass)
-            for discovery in discoveries:
-                if (
-                    discovery.address in current_addresses
-                    or discovery.address in self._discovered_devices
-                ):
-                    continue
-                has_service_data = (
-                    discovery.service_data is not None
-                    and SERVICE_UUID in discovery.service_data.keys()
-                )
-                has_service_uuid = SERVICE_UUID in (discovery.service_uuids or [])
-                if has_service_data or has_service_uuid:
-                    self._discovered_devices[discovery.address] = discovery
+
+            # Use async_register_callback which also fires for historical/cached
+            # devices, unlike async_discovered_service_info which only returns
+            # currently active advertisements.
+            @callback
+            def _device_discovered(
+                service_info: BluetoothServiceInfoBleak,
+                change: BluetoothChange,
+            ) -> None:
+                if service_info.address not in current_addresses:
+                    self._discovered_devices[service_info.address] = service_info
+
+            cancel = bluetooth.async_register_callback(
+                self.hass,
+                _device_discovered,
+                {"service_data_uuid": SERVICE_UUID},
+                bluetooth.BluetoothScanningMode.PASSIVE,
+            )
+            cancel()
+
+            # Also check service_uuid (without data payload) as fallback
+            @callback
+            def _device_discovered_uuid(
+                service_info: BluetoothServiceInfoBleak,
+                change: BluetoothChange,
+            ) -> None:
+                if service_info.address not in current_addresses:
+                    self._discovered_devices[service_info.address] = service_info
+
+            cancel2 = bluetooth.async_register_callback(
+                self.hass,
+                _device_discovered_uuid,
+                {"service_uuid": SERVICE_UUID},
+                bluetooth.BluetoothScanningMode.PASSIVE,
+            )
+            cancel2()
 
         if not self._discovered_devices:
             return self.async_abort(reason="no_unconfigured_devices")
