@@ -16,6 +16,12 @@
         },
         "description": "Select Tuya BLE device to setup. Device must be registered in the cloud using the mobile application. It's better to unbind the device from Tuya Bluetooth gateway, if any."
       },
+      "link_device": {
+        "data": {
+          "device_id": "Tuya cloud device"
+        },
+        "description": "The Bluetooth MAC address does not match the Tuya cloud MAC (this is normal for some devices). Select which cloud device corresponds to your BLE device."
+      },
       "manual": {
         "data": {
           "address": "Bluetooth MAC address"

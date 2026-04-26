@@ -215,6 +215,7 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
         self._data: dict[str, Any] = {}
         self._manager: HASSTuyaBLEDeviceManager | None = None
         self._get_device_info_error = False
+        self._ble_address: str | None = None
 
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfoBleak
@@ -296,6 +297,11 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             self._data[CONF_ADDRESS] = address
             if credentials is None:
+                # MAC mismatch between BLE and Tuya cloud — let user link manually
+                self._ble_address = address
+                cloud_devices = self._manager.get_cloud_devices()
+                if cloud_devices:
+                    return await self.async_step_link_device()
                 self._get_device_info_error = True
                 errors["base"] = "device_not_registered"
             else:
@@ -345,6 +351,50 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
 
         # No devices auto-discovered — fall through to manual address entry
         return await self.async_step_manual(user_input=None)
+
+    async def async_step_link_device(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Link a BLE address to a Tuya cloud device when MACs don't match."""
+        errors: dict[str, str] = {}
+        cloud_devices = self._manager.get_cloud_devices()
+
+        if user_input is not None:
+            device_id = user_input["device_id"]
+            device = next(
+                (d for d in cloud_devices if d[CONF_DEVICE_ID] == device_id), None
+            )
+            if device:
+                self._manager.set_credentials_for_address(self._ble_address, device)
+                credentials = await self._manager.get_device_credentials(
+                    self._ble_address, False, True
+                )
+                if credentials:
+                    name = device.get(CONF_DEVICE_NAME) or self._ble_address
+                    return self.async_create_entry(
+                        title=name,
+                        data={CONF_ADDRESS: self._ble_address},
+                        options=self._data,
+                    )
+            errors["base"] = "device_not_registered"
+
+        device_options = {
+            d[CONF_DEVICE_ID]: (
+                f"{d.get(CONF_DEVICE_NAME) or d.get(CONF_PRODUCT_NAME) or 'Unknown'}"
+                f" ({d.get(CONF_PRODUCT_ID, '')})"
+            )
+            for d in cloud_devices
+        }
+
+        return self.async_show_form(
+            step_id="link_device",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("device_id"): vol.In(device_options),
+                }
+            ),
+            errors=errors,
+        )
 
     async def async_step_manual(
         self, user_input: dict[str, Any] | None = None

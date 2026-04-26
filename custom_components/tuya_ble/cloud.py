@@ -63,6 +63,11 @@ class TuyaCloudCacheItem:
     api: TuyaOpenAPI | None
     login: dict[str, Any]
     credentials: dict[str, dict[str, Any]]
+    devices: list[dict[str, Any]] = None
+
+    def __post_init__(self):
+        if self.devices is None:
+            self.devices = []
 
 
 CONF_TUYA_LOGIN_KEYS = [
@@ -218,18 +223,19 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                             )
 
                     _LOGGER.warning("tuya_ble resolved mac=%s", mac)
+                    device_entry = {
+                        CONF_UUID: device.get("uuid"),
+                        CONF_LOCAL_KEY: device.get("local_key"),
+                        CONF_DEVICE_ID: device.get("id"),
+                        CONF_CATEGORY: device.get("category"),
+                        CONF_PRODUCT_ID: device.get("product_id"),
+                        CONF_DEVICE_NAME: device.get("name"),
+                        CONF_PRODUCT_MODEL: device.get("model"),
+                        CONF_PRODUCT_NAME: device.get("product_name"),
+                    }
+                    item.devices.append(device_entry)
                     if mac:
-                        item.credentials[mac] = {
-                            CONF_ADDRESS: mac,
-                            CONF_UUID: device.get("uuid"),
-                            CONF_LOCAL_KEY: device.get("local_key"),
-                            CONF_DEVICE_ID: device.get("id"),
-                            CONF_CATEGORY: device.get("category"),
-                            CONF_PRODUCT_ID: device.get("product_id"),
-                            CONF_DEVICE_NAME: device.get("name"),
-                            CONF_PRODUCT_MODEL: device.get("model"),
-                            CONF_PRODUCT_NAME: device.get("product_name"),
-                        }
+                        item.credentials[mac] = {CONF_ADDRESS: mac, **device_entry}
 
     async def build_cache(self) -> None:
         global _cache
@@ -257,6 +263,23 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                     item = _cache.get(key)
                     if item and len(item.credentials) == 0:
                         await self._fill_cache_item(item)
+
+    def get_cloud_devices(self) -> list[dict[str, Any]]:
+        """Return all devices from Tuya cloud cache."""
+        global _cache
+        cache_key = self._get_cache_key(self._data)
+        item = _cache.get(cache_key)
+        if item:
+            return item.devices
+        return []
+
+    def set_credentials_for_address(self, address: str, device: dict[str, Any]) -> None:
+        """Manually link a BLE address to a cloud device."""
+        global _cache
+        cache_key = self._get_cache_key(self._data)
+        item = _cache.get(cache_key)
+        if item:
+            item.credentials[address] = {CONF_ADDRESS: address, **device}
 
     def get_login_from_cache(self) -> None:
         global _cache
