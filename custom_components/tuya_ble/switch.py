@@ -328,6 +328,18 @@ mapping: dict[str, TuyaBLECategorySwitchMapping] = {
             ],
         },
     ),
+    "cz": TuyaBLECategorySwitchMapping(
+        products={
+            "d6r94tvs": [  # Calex Smart Socket
+                TuyaBLESwitchMapping(
+                    dp_id=1,
+                    description=SwitchEntityDescription(
+                        key="switch",
+                    ),
+                ),
+            ],
+        },
+    ),
 }
 
 

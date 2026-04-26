@@ -300,6 +300,14 @@ devices_database: dict[str, TuyaBLECategoryInfo] = {
             ),
         },
     ),
+    "cz": TuyaBLECategoryInfo(
+        products={
+            "d6r94tvs": TuyaBLEProductInfo(  # device product_id
+                name="Smart Socket",
+                manufacturer="Calex",
+            ),
+        },
+    ),
 }
 
 
