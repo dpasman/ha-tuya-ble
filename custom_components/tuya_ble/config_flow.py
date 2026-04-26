@@ -28,7 +28,11 @@ from .const import (
     CONF_APP_TYPE,
     CONF_AUTH_TYPE,
     CONF_COUNTRY_CODE,
+    CONF_DEVICE_NAME,
     CONF_ENDPOINT,
+    CONF_PRODUCT_ID,
+    CONF_PRODUCT_NAME,
+    DOMAIN,
     SMARTLIFE_APP,
     TUYA_COUNTRIES,
     TUYA_RESPONSE_CODE,
@@ -36,12 +40,9 @@ from .const import (
     TUYA_RESPONSE_SUCCESS,
     TUYA_SMART_APP,
 )
+from homeassistant.const import CONF_DEVICE_ID
 
 from .tuya_ble import SERVICE_UUID, TuyaBLEDeviceCredentials
-
-from .const import (
-    DOMAIN,
-)
 from .devices import TuyaBLEData, get_device_readable_name
 from .cloud import HASSTuyaBLEDeviceManager
 
