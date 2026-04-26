@@ -311,7 +311,11 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
             self._discovered_devices[discovery.address] = discovery
         else:
             current_addresses = self._async_current_ids()
-            for discovery in async_discovered_service_info(self.hass):
+            try:
+                discoveries = async_discovered_service_info(self.hass, connectable=False)
+            except TypeError:
+                discoveries = async_discovered_service_info(self.hass)
+            for discovery in discoveries:
                 if (
                     discovery.address in current_addresses
                     or discovery.address in self._discovered_devices
