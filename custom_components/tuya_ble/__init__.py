@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import logging
 
-from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS as BLEAK_EXCEPTIONS, get_device
-
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth.match import ADDRESS, BluetoothCallbackMatcher
 from homeassistant.config_entries import ConfigEntry
@@ -37,7 +35,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     address: str = entry.data[CONF_ADDRESS]
     ble_device = bluetooth.async_ble_device_from_address(
         hass, address.upper(), True
-    ) or await get_device(address)
+    ) or bluetooth.async_ble_device_from_address(
+        hass, address.upper(), False
+    )
     if not ble_device:
         raise ConfigEntryNotReady(
             f"Could not find Tuya BLE device with address {address}"
