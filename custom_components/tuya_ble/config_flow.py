@@ -289,23 +289,23 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             address = user_input[CONF_ADDRESS]
-            discovery_info = self._discovered_devices[address]
-            local_name = await get_device_readable_name(discovery_info, self._manager)
-            await self.async_set_unique_id(
-                discovery_info.address, raise_on_progress=False
-            )
+            discovery_info = self._discovered_devices.get(address)
+            local_name = await get_device_readable_name(
+                discovery_info, self._manager
+            ) if discovery_info else address
+            await self.async_set_unique_id(address, raise_on_progress=False)
             self._abort_if_unique_id_configured()
             credentials = await self._manager.get_device_credentials(
-                discovery_info.address, self._get_device_info_error, True
+                address, self._get_device_info_error, True
             )
-            self._data[CONF_ADDRESS] = discovery_info.address
+            self._data[CONF_ADDRESS] = address
             if credentials is None:
                 self._get_device_info_error = True
                 errors["base"] = "device_not_registered"
             else:
                 return self.async_create_entry(
                     title=local_name,
-                    data={CONF_ADDRESS: discovery_info.address},
+                    data={CONF_ADDRESS: address},
                     options=self._data,
                 )
 
@@ -313,69 +313,73 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
             self._discovered_devices[discovery.address] = discovery
         else:
             current_addresses = self._async_current_ids()
+            try:
+                discoveries = async_discovered_service_info(self.hass, connectable=False)
+            except TypeError:
+                discoveries = async_discovered_service_info(self.hass)
+            for discovery in discoveries:
+                if discovery.address in current_addresses:
+                    continue
+                has_service_data = (
+                    discovery.service_data is not None
+                    and SERVICE_UUID in discovery.service_data
+                )
+                has_service_uuid = SERVICE_UUID in (discovery.service_uuids or [])
+                if has_service_data or has_service_uuid:
+                    self._discovered_devices[discovery.address] = discovery
 
-            # Use async_register_callback which also fires for historical/cached
-            # devices, unlike async_discovered_service_info which only returns
-            # currently active advertisements.
-            @callback
-            def _device_discovered(
-                service_info: BluetoothServiceInfoBleak,
-                change: BluetoothChange,
-            ) -> None:
-                if service_info.address not in current_addresses:
-                    self._discovered_devices[service_info.address] = service_info
-
-            cancel = bluetooth.async_register_callback(
-                self.hass,
-                _device_discovered,
-                {"service_data_uuid": SERVICE_UUID},
-                bluetooth.BluetoothScanningMode.PASSIVE,
-            )
-            cancel()
-
-            # Also check service_uuid (without data payload) as fallback
-            @callback
-            def _device_discovered_uuid(
-                service_info: BluetoothServiceInfoBleak,
-                change: BluetoothChange,
-            ) -> None:
-                if service_info.address not in current_addresses:
-                    self._discovered_devices[service_info.address] = service_info
-
-            cancel2 = bluetooth.async_register_callback(
-                self.hass,
-                _device_discovered_uuid,
-                {"service_uuid": SERVICE_UUID},
-                bluetooth.BluetoothScanningMode.PASSIVE,
-            )
-            cancel2()
-
-        if not self._discovered_devices:
-            return self.async_abort(reason="no_unconfigured_devices")
-
-        def_address: str
-        if user_input:
-            def_address = user_input.get(CONF_ADDRESS)
-        else:
+        if self._discovered_devices:
             def_address = list(self._discovered_devices)[0]
+            return self.async_show_form(
+                step_id="device",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required(CONF_ADDRESS, default=def_address): vol.In(
+                            {
+                                service_info.address: await get_device_readable_name(
+                                    service_info, self._manager
+                                )
+                                for service_info in self._discovered_devices.values()
+                            }
+                        ),
+                    }
+                ),
+                errors=errors,
+            )
+
+        # No devices auto-discovered — fall through to manual address entry
+        return await self.async_step_manual(user_input=None)
+
+    async def async_step_manual(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Allow manual entry of a Bluetooth MAC address."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            address = user_input[CONF_ADDRESS].upper().strip()
+            await self.async_set_unique_id(address, raise_on_progress=False)
+            self._abort_if_unique_id_configured()
+            credentials = await self._manager.get_device_credentials(
+                address, self._get_device_info_error, True
+            )
+            self._data[CONF_ADDRESS] = address
+            if credentials is None:
+                self._get_device_info_error = True
+                errors["base"] = "device_not_registered"
+            else:
+                return self.async_create_entry(
+                    title=address,
+                    data={CONF_ADDRESS: address},
+                    options=self._data,
+                )
 
         return self.async_show_form(
-            step_id="device",
+            step_id="manual",
             data_schema=vol.Schema(
                 {
-                    vol.Required(
-                        CONF_ADDRESS,
-                        default=def_address,
-                    ): vol.In(
-                        {
-                            service_info.address: await get_device_readable_name(
-                                service_info,
-                                self._manager,
-                            )
-                            for service_info in self._discovered_devices.values()
-                        }
-                    ),
-                },
+                    vol.Required(CONF_ADDRESS): str,
+                }
             ),
             errors=errors,
         )

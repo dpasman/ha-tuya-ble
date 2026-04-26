@@ -16,6 +16,12 @@
                 },
                 "description": "Select Tuya BLE device to setup. Device must be registered in the cloud using the mobile application. It's better to unbind the device from Tuya Bluetooth gateway, if any."
             },
+            "manual": {
+                "data": {
+                    "address": "Bluetooth MAC address"
+                },
+                "description": "No Tuya BLE devices were automatically discovered. Enter the Bluetooth MAC address of your device manually. You can find it in Settings → System → Bluetooth."
+            },
             "login": {
                 "data": {
                     "access_id": "Tuya IoT Access ID",
