@@ -176,6 +176,7 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
             devices = devices_response.get(TUYA_RESPONSE_RESULT)
             if isinstance(devices, Iterable):
                 for device in devices:
+                    mac: str | None = None
                     fi_response = await self._hass.async_add_executor_job(
                         item.api.get,
                         TUYA_API_FACTORY_INFO_URL % (device.get("id")),
@@ -188,17 +189,30 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                                 factory_info[TUYA_FACTORY_INFO_MAC][i : i + 2]
                                 for i in range(0, 12, 2)
                             ).upper()
-                            item.credentials[mac] = {
-                                CONF_ADDRESS: mac,
-                                CONF_UUID: device.get("uuid"),
-                                CONF_LOCAL_KEY: device.get("local_key"),
-                                CONF_DEVICE_ID: device.get("id"),
-                                CONF_CATEGORY: device.get("category"),
-                                CONF_PRODUCT_ID: device.get("product_id"),
-                                CONF_DEVICE_NAME: device.get("name"),
-                                CONF_PRODUCT_MODEL: device.get("model"),
-                                CONF_PRODUCT_NAME: device.get("product_name"),
-                            }
+
+                    # Fallback: for BLE devices the uuid is often the MAC
+                    # without colons (e.g. "4ca9199f0b98")
+                    if mac is None:
+                        uuid = device.get("uuid", "")
+                        if len(uuid) == 12 and all(
+                            c in "0123456789abcdefABCDEF" for c in uuid
+                        ):
+                            mac = ":".join(
+                                uuid[i : i + 2].upper() for i in range(0, 12, 2)
+                            )
+
+                    if mac:
+                        item.credentials[mac] = {
+                            CONF_ADDRESS: mac,
+                            CONF_UUID: device.get("uuid"),
+                            CONF_LOCAL_KEY: device.get("local_key"),
+                            CONF_DEVICE_ID: device.get("id"),
+                            CONF_CATEGORY: device.get("category"),
+                            CONF_PRODUCT_ID: device.get("product_id"),
+                            CONF_DEVICE_NAME: device.get("name"),
+                            CONF_PRODUCT_MODEL: device.get("model"),
+                            CONF_PRODUCT_NAME: device.get("product_name"),
+                        }
 
     async def build_cache(self) -> None:
         global _cache
