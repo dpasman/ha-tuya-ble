@@ -172,16 +172,32 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
             item.api.get,
             TUYA_API_DEVICES_URL % (item.api.token_info.uid),
         )
+        _LOGGER.warning(
+            "tuya_ble devices response success=%s",
+            devices_response.get(TUYA_RESPONSE_SUCCESS),
+        )
         if devices_response.get(TUYA_RESPONSE_SUCCESS):
             devices = devices_response.get(TUYA_RESPONSE_RESULT)
             if isinstance(devices, Iterable):
                 for device in devices:
                     mac: str | None = None
+                    _LOGGER.warning(
+                        "tuya_ble device id=%s uuid=%s category=%s product_id=%s",
+                        device.get("id"),
+                        device.get("uuid"),
+                        device.get("category"),
+                        device.get("product_id"),
+                    )
                     fi_response = await self._hass.async_add_executor_job(
                         item.api.get,
                         TUYA_API_FACTORY_INFO_URL % (device.get("id")),
                     )
                     fi_response_result = fi_response.get(TUYA_RESPONSE_RESULT)
+                    _LOGGER.warning(
+                        "tuya_ble factory_info for %s: %s",
+                        device.get("id"),
+                        fi_response_result,
+                    )
                     if fi_response_result and len(fi_response_result) > 0:
                         factory_info = fi_response_result[0]
                         if factory_info and (TUYA_FACTORY_INFO_MAC in factory_info):
@@ -201,6 +217,7 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                                 uuid[i : i + 2].upper() for i in range(0, 12, 2)
                             )
 
+                    _LOGGER.warning("tuya_ble resolved mac=%s", mac)
                     if mac:
                         item.credentials[mac] = {
                             CONF_ADDRESS: mac,
