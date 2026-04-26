@@ -315,11 +315,15 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
                 if (
                     discovery.address in current_addresses
                     or discovery.address in self._discovered_devices
-                    or discovery.service_data is None
-                    or not SERVICE_UUID in discovery.service_data.keys()
                 ):
                     continue
-                self._discovered_devices[discovery.address] = discovery
+                has_service_data = (
+                    discovery.service_data is not None
+                    and SERVICE_UUID in discovery.service_data.keys()
+                )
+                has_service_uuid = SERVICE_UUID in (discovery.service_uuids or [])
+                if has_service_data or has_service_uuid:
+                    self._discovered_devices[discovery.address] = discovery
 
         if not self._discovered_devices:
             return self.async_abort(reason="no_unconfigured_devices")
