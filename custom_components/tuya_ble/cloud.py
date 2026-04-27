@@ -51,6 +51,7 @@ from .const import (
     CONF_PRODUCT_NAME,
     DOMAIN,
     TUYA_API_DEVICES_URL,
+    TUYA_API_DEVICE_URL,
     TUYA_API_FACTORY_INFO_URL,
     TUYA_FACTORY_INFO_MAC,
 )
@@ -223,9 +224,24 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                             )
 
                     _LOGGER.warning("tuya_ble resolved mac=%s", mac)
+                    local_key = device.get("local_key")
+                    if not local_key:
+                        # Some API authorization levels omit local_key from the
+                        # list endpoint — try the individual device endpoint.
+                        detail_response = await self._hass.async_add_executor_job(
+                            item.api.get,
+                            TUYA_API_DEVICE_URL % device.get("id"),
+                        )
+                        if detail_response.get(TUYA_RESPONSE_SUCCESS):
+                            detail = detail_response.get(TUYA_RESPONSE_RESULT, {})
+                            local_key = detail.get("local_key")
+                            _LOGGER.warning(
+                                "tuya_ble fetched local_key from detail endpoint: %s",
+                                "present" if local_key else "still missing",
+                            )
                     device_entry = {
                         CONF_UUID: device.get("uuid"),
-                        CONF_LOCAL_KEY: device.get("local_key"),
+                        CONF_LOCAL_KEY: local_key,
                         CONF_DEVICE_ID: device.get("id"),
                         CONF_CATEGORY: device.get("category"),
                         CONF_PRODUCT_ID: device.get("product_id"),
