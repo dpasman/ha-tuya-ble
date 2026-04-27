@@ -300,7 +300,14 @@ class TuyaBLEDevice:
                     self._ble_device.address, False
                 )
             if self._device_info:
-                self._local_key = self._device_info.local_key[:6].encode()
+                local_key = self._device_info.local_key or ""
+                if not local_key:
+                    _LOGGER.error(
+                        "%s: local_key is missing from credentials", self.address
+                    )
+                    self._device_info = None
+                    return False
+                self._local_key = local_key[:6].encode()
                 self._login_key = hashlib.md5(self._local_key).digest()
 
         return self._device_info is not None

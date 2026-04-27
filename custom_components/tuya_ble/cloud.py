@@ -322,15 +322,22 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                 credentials = item.credentials.get(address)
 
         if credentials:
+            local_key = credentials.get(CONF_LOCAL_KEY) or ""
+            if not local_key:
+                _LOGGER.error(
+                    "Device at %s has no local_key — check Tuya IoT Platform "
+                    "API permissions (need 'Device Management' scope)", address
+                )
+                return None
             result = TuyaBLEDeviceCredentials(
-                credentials.get(CONF_UUID, ""),
-                credentials.get(CONF_LOCAL_KEY, ""),
-                credentials.get(CONF_DEVICE_ID, ""),
-                credentials.get(CONF_CATEGORY, ""),
-                credentials.get(CONF_PRODUCT_ID, ""),
-                credentials.get(CONF_DEVICE_NAME, ""),
-                credentials.get(CONF_PRODUCT_MODEL, ""),
-                credentials.get(CONF_PRODUCT_NAME, ""),
+                credentials.get(CONF_UUID) or "",
+                local_key,
+                credentials.get(CONF_DEVICE_ID) or "",
+                credentials.get(CONF_CATEGORY) or "",
+                credentials.get(CONF_PRODUCT_ID) or "",
+                credentials.get(CONF_DEVICE_NAME),
+                credentials.get(CONF_PRODUCT_MODEL),
+                credentials.get(CONF_PRODUCT_NAME),
             )
             _LOGGER.debug("Retrieved: %s", result)
             if save_data:
