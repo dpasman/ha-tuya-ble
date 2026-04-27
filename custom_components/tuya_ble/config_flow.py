@@ -30,6 +30,7 @@ from .const import (
     CONF_COUNTRY_CODE,
     CONF_DEVICE_NAME,
     CONF_ENDPOINT,
+    CONF_LOCAL_KEY,
     CONF_PRODUCT_ID,
     CONF_PRODUCT_NAME,
     DOMAIN,
@@ -223,6 +224,7 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
         self._manager: HASSTuyaBLEDeviceManager | None = None
         self._get_device_info_error = False
         self._ble_address: str | None = None
+        self._selected_device: dict[str, Any] | None = None
 
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfoBleak
@@ -383,6 +385,8 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
                         data={CONF_ADDRESS: self._ble_address},
                         options=self._data,
                     )
+                self._selected_device = device
+                return await self.async_step_enter_local_key()
             errors["base"] = "device_not_registered"
 
         device_options = {
@@ -398,6 +402,46 @@ class TuyaBLEConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required("device_id"): vol.In(device_options),
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_enter_local_key(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Ask the user to manually enter the local_key when the API omits it."""
+        if self._ble_address is None:
+            return self.async_abort(reason="no_unconfigured_devices")
+
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            local_key = user_input.get(CONF_LOCAL_KEY, "").strip()
+            if not local_key:
+                errors["base"] = "invalid_local_key"
+            else:
+                self._manager.patch_local_key(self._ble_address, local_key)
+                credentials = await self._manager.get_device_credentials(
+                    self._ble_address, True, True
+                )
+                if credentials:
+                    name = (
+                        (self._selected_device or {}).get(CONF_DEVICE_NAME)
+                        or self._ble_address
+                    )
+                    return self.async_create_entry(
+                        title=name,
+                        data={CONF_ADDRESS: self._ble_address},
+                        options=self._data,
+                    )
+                errors["base"] = "local_key_credentials_failed"
+
+        return self.async_show_form(
+            step_id="enter_local_key",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_LOCAL_KEY): str,
                 }
             ),
             errors=errors,

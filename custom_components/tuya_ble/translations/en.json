@@ -6,6 +6,8 @@
         "error": {
             "device_not_registered": "Device is not registered in Tuya cloud",
             "invalid_auth": "Invalid authentication",
+            "invalid_local_key": "Invalid or empty local key",
+            "local_key_credentials_failed": "Local key accepted but credentials could not be built — the key may be incorrect or the cloud cache is stale",
             "login_error": "Login error ({code}): {msg}"
         },
         "flow_title": "{name}",
@@ -21,6 +23,12 @@
                     "device_id": "Tuya cloud device"
                 },
                 "description": "The Bluetooth MAC address does not match the Tuya cloud MAC (this is normal for some devices). Select which cloud device corresponds to your BLE device."
+            },
+            "enter_local_key": {
+                "data": {
+                    "local_key": "Local key"
+                },
+                "description": "The Tuya cloud API did not return the local encryption key for this device. You can find it on the Tuya IoT Platform under your project → Devices → Device details, or by using the LocalTuya method. Enter the local key (usually 16 characters) below."
             },
             "manual": {
                 "data": {

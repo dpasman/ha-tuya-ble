@@ -19,6 +19,8 @@ from .const import (
     CONF_COUNTRY_CODE,
     CONF_ENDPOINT,
     TUYA_DOMAIN,
+    TUYA_RESPONSE_CODE,
+    TUYA_RESPONSE_MSG,
     TUYA_RESPONSE_RESULT,
     TUYA_RESPONSE_SUCCESS,
 )
@@ -93,6 +95,8 @@ CONF_TUYA_DEVICE_KEYS = [
     CONF_PRODUCT_MODEL,
 ]
 
+CONF_TUYA_DEVICE_REQUIRED_KEYS = [CONF_UUID, CONF_LOCAL_KEY, CONF_DEVICE_ID]
+
 _cache: dict[str, TuyaCloudCacheItem] = {}
 
 
@@ -122,8 +126,8 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
 
     @staticmethod
     def _has_credentials(data: dict[Any, Any]) -> bool:
-        for key in CONF_TUYA_DEVICE_KEYS:
-            if data.get(key) is None:
+        for key in CONF_TUYA_DEVICE_REQUIRED_KEYS:
+            if not data.get(key):
                 return False
         return True
 
@@ -239,6 +243,13 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                                 "tuya_ble fetched local_key from detail endpoint: %s",
                                 "present" if local_key else "still missing",
                             )
+                        else:
+                            _LOGGER.warning(
+                                "tuya_ble detail endpoint failed for %s: code=%s msg=%s",
+                                device.get("id"),
+                                detail_response.get(TUYA_RESPONSE_CODE),
+                                detail_response.get(TUYA_RESPONSE_MSG),
+                            )
                     device_entry = {
                         CONF_UUID: device.get("uuid"),
                         CONF_LOCAL_KEY: local_key,
@@ -296,6 +307,19 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
         item = _cache.get(cache_key)
         if item:
             item.credentials[address] = {CONF_ADDRESS: address, **device}
+
+    def patch_local_key(self, address: str, local_key: str) -> None:
+        """Set local_key for an already-cached address (API omitted it)."""
+        global _cache
+        cache_key = self._get_cache_key(self._data)
+        item = _cache.get(cache_key)
+        if item and address in item.credentials:
+            item.credentials[address][CONF_LOCAL_KEY] = local_key
+        else:
+            _LOGGER.warning(
+                "patch_local_key: cache miss for address %s — key will not be applied",
+                address,
+            )
 
     def get_login_from_cache(self) -> None:
         global _cache
