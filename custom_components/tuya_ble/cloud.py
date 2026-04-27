@@ -312,10 +312,10 @@ class HASSTuyaBLEDeviceManager(AbstaractTuyaBLEDeviceManager):
                         break
             if cache_key:
                 item = _cache.get(cache_key)
-            if item is None or force_update:
+            if item is None or force_update or (item and len(item.credentials) == 0):
                 if self._is_login_success(await self.login(True)):
                     item = _cache.get(cache_key)
-                    if item:
+                    if item and len(item.credentials) == 0:
                         await self._fill_cache_item(item)
 
             if item:
